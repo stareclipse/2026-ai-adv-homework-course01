@@ -1,0 +1,43 @@
+# Block dangerous delete patterns
+prefix_rule(
+    pattern = ["rm", "-rf"],
+    decision = "forbidden",
+    justification = "Dangerous recursive delete is blocked.",
+    match = [
+        "rm -rf node_modules",
+        "rm -rf /tmp/test",
+    ],
+)
+
+# Block sudo
+prefix_rule(
+    pattern = ["sudo"],
+    decision = "forbidden",
+    justification = "Use normal user permissions instead of sudo.",
+    match = [
+        "sudo npm install",
+        "sudo rm -rf /",
+    ],
+)
+
+# Block git push
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "Pushing to remote is blocked from Codex.",
+    match = [
+        "git push",
+        "git push origin main",
+    ],
+)
+
+# Block git reset --hard
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Hard reset is blocked to avoid destructive history loss.",
+    match = [
+        "git reset --hard",
+        "git reset --hard HEAD~1",
+    ],
+)
