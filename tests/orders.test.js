@@ -229,7 +229,7 @@ describe('Orders API', () => {
     }
   });
 
-  it.each(['10100248', '10100254'])('should map TradeStatus %s to failed', async (tradeStatus) => {
+  it.each(['10100248', '10100254', '10100058'])('should map TradeStatus %s to failed', async (tradeStatus) => {
     const paymentOrder = await createOrderForPaymentTest();
     await request(app)
       .post(`/api/orders/${paymentOrder.id}/ecpay/checkout`)

@@ -384,7 +384,7 @@ PRAGMA foreign_keys = ON;
 5. 綠界 Server Notify 不可作為本機主流程，因此 `ReturnURL`、`ClientBackURL`、`ClientRedirectURL` 都先進入本站公開 `/ecpay/*` 路由。
 6. `/ecpay/client-back` 與 `/ecpay/client-redirect` 會先呼叫同一套 reconcile helper，再 redirect 到 `/orders/:id?payment=success|failed|returned`。
 7. `POST /api/orders/:id/ecpay/query` 與 `/ecpay/*` 共用同一套 `QueryTradeInfo/V5` 驗證與訂單更新邏輯。
-8. `TradeStatus=1` 更新為 `paid`；`10100248`、`10100254`、`10200095`、`10200163` 更新為 `failed`；其他狀態維持 `pending`。
+8. `TradeStatus=1` 更新為 `paid`；`10100058`、`10100248`、`10100254`、`10200095`、`10200163` 更新為 `failed`；其他狀態維持 `pending`。
 9. ATM/CVS/BARCODE pending 訂單會嘗試呼叫 `QueryPaymentInfo` 取得繳費資訊；訂單頁只做有限次退避補查，不做固定輪詢。
 
 `PATCH /api/orders/:id/pay` 模擬付款端點已停用，固定回 `410 PAYMENT_FLOW_REMOVED`。

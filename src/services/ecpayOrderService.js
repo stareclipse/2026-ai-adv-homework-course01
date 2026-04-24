@@ -9,6 +9,7 @@ const {
 } = require('./ecpayService');
 
 const FAILED_TRADE_STATUSES = new Set([
+  '10100058',
   '10100248',
   '10100254',
   '10200095',
