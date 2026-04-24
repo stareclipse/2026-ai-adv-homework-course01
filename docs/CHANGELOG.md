@@ -36,6 +36,10 @@
 
 ### Changed
 
+- 重整 Codex 文件結構：
+  - 新增 `docs/API_REFERENCE.md`，集中維護 API 端點、認證需求、錯誤碼與 ECPay 狀態 mapping。
+  - 精簡 `docs/FEATURES.md` 為功能狀態與使用者可見行為摘要，確保 docs 單檔維持 500 行內。
+  - 更新 `AGENTS.md` 的 ECPay 狀態描述，避免 Codex 讀到過期的模擬付款資訊。
 - 重整 ECPay 本地端返回商店流程：
   - 新增 `src/routes/ecpayRoutes.js`，提供 `/ecpay/client-back`、`/ecpay/client-redirect`、`/ecpay/notify`。
   - 新增 `src/services/ecpayOrderService.js`，集中處理綠界查詢驗證、失敗碼 mapping、離線繳費資訊補查與訂單寫回。

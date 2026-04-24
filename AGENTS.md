@@ -22,7 +22,7 @@ backend-project - 花卉電商 Demo。技術棧為 Node.js、Express 4、EJS、V
 - 後台 API 必須先套用 `authMiddleware`，再套用 `adminMiddleware`；不可只檢查前端登入狀態。
 - 購物車是雙模式認證：有有效 Bearer JWT 時使用 `user_id`，否則使用 `X-Session-Id` 對應 `session_id`；若送了無效 JWT 不可退回 session。
 - 訂單建立必須使用 SQLite transaction，同步建立訂單、建立明細、扣庫存、清空登入會員購物車。
-- `.env.example` 已保留 ECPay 變數，但目前程式碼沒有真正串接綠界；付款功能是 `/api/orders/:id/pay` 的模擬狀態更新。
+- ECPay AIO 已整合；付款狀態以本地端主動查詢綠界驗證為準，舊 `/api/orders/:id/pay` 模擬付款已停用。
 - 功能開發使用 `docs/plans/` 記錄計畫；完成後移至 `docs/plans/archive/`，並同步更新 `docs/FEATURES.md` 和 `docs/CHANGELOG.md`。
 
 ## 詳細文件
@@ -31,5 +31,6 @@ backend-project - 花卉電商 Demo。技術棧為 Node.js、Express 4、EJS、V
 - `./docs/ARCHITECTURE.md` - 架構、目錄結構、資料流
 - `./docs/DEVELOPMENT.md` - 開發規範、命名規則
 - `./docs/FEATURES.md` - 功能列表與完成狀態
+- `./docs/API_REFERENCE.md` - API 端點、認證需求、錯誤碼
 - `./docs/TESTING.md` - 測試規範與指南
 - `./docs/CHANGELOG.md` - 更新日誌

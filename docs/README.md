@@ -92,9 +92,11 @@ ECPAY_ENV=staging
 | 文件 | 用途 |
 | --- | --- |
 | `docs/ARCHITECTURE.md` | 架構、啟動流程、資料流、API route、DB schema、認證與金流現況 |
-| `docs/FEATURES.md` | 功能清單、完成狀態、API 參數、業務規則、錯誤情境 |
+| `docs/FEATURES.md` | 功能清單、完成狀態、使用者可見行為摘要 |
+| `docs/API_REFERENCE.md` | API 端點、認證需求、主要錯誤碼、ECPay 狀態 mapping |
 | `docs/DEVELOPMENT.md` | 開發規範、命名規則、環境變數、新增功能流程、計畫歸檔流程 |
 | `docs/TESTING.md` | 測試架構、測試檔案、執行順序、輔助函式、常見陷阱 |
+| `docs/ECPAY_SETUP.md` | ECPay 本地端設定、操作測試流程、故障排除 |
 | `docs/CHANGELOG.md` | 更新日誌 |
 | `docs/plans/` | 開發計畫工作區 |
 | `docs/plans/archive/` | 已完成計畫歸檔 |

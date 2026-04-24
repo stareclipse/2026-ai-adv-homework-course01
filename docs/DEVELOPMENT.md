@@ -268,11 +268,18 @@ createApp({
 
 ## 文件更新規則
 
+文件行數限制：
+
+- `AGENTS.md` 是 Codex 主要記憶文件，必須維持 100 行內。
+- `docs/**/*.md` 每個文件必須維持 500 行內。
+- 詳細內容應拆到 `docs/` 中合適的延伸文件，不要塞回 `AGENTS.md`。
+
 | 變更 | 必須更新 |
 | --- | --- |
-| 新增 API、修改 request/response | `docs/FEATURES.md`、`docs/ARCHITECTURE.md` |
+| 新增 API、修改 request/response | `docs/API_REFERENCE.md`、必要時更新 `docs/ARCHITECTURE.md` |
+| 新增或移除使用者可見功能 | `docs/FEATURES.md` |
 | 新增資料表或欄位 | `docs/ARCHITECTURE.md`、`docs/DEVELOPMENT.md` 如流程改變 |
 | 新增測試 helper 或改測試順序 | `docs/TESTING.md` |
 | 新增 npm script | `AGENTS.md`、`docs/README.md` |
 | 完成功能或修復重要 bug | `docs/CHANGELOG.md` |
-| 新增第三方整合 | `docs/ARCHITECTURE.md`、`docs/FEATURES.md`、`.env.example` |
+| 新增第三方整合 | `docs/ARCHITECTURE.md`、`docs/FEATURES.md`、`docs/API_REFERENCE.md`、`.env.example` |

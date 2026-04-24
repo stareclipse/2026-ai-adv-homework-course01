@@ -124,63 +124,7 @@ npm run dev:css
 
 ## API 端點
 
-### 建立付款表單
-
-```
-POST /api/orders/{orderId}/ecpay/checkout
-Authorization: Bearer {token}
-
-Response:
-{
-  "data": {
-    "action": "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5",
-    "method": "POST",
-    "params": {
-      "MerchantID": "3002607",
-      "MerchantTradeNo": "F260423...",
-      "MerchantTradeDate": "2026/04/23 10:20:30",
-      "PaymentType": "aio",
-      "TotalAmount": "1680",
-      "TradeDesc": "Flower Shop Order",
-      "ItemName": "粉色玫瑰花束 x 1#...",
-      "ReturnURL": "http://localhost:3001/ecpay/notify",
-      "ClientBackURL": "http://localhost:3001/ecpay/client-back?orderId=order-1",
-      "ClientRedirectURL": "http://localhost:3001/ecpay/client-redirect?orderId=order-1",
-      "ChoosePayment": "ALL",
-      "EncryptType": "1",
-      "CheckMacValue": "291CBA324D..."
-    }
-  },
-  "error": null,
-  "message": "ECPay 付款表單建立成功"
-}
-```
-
-### 查詢付款狀態
-
-```
-POST /api/orders/{orderId}/ecpay/query
-Authorization: Bearer {token}
-
-Response:
-{
-  "data": {
-    "id": "order-1",
-    "status": "paid",
-    "ecpay_trade_no": "2004231020304811",
-    "ecpay_payment_type": "Credit",
-    "ecpay_payment_date": "2026/04/23 10:30:15",
-    "items": [...],
-    "paymentResult": {
-      "tradeStatus": "1",
-      "paymentStatus": "paid",
-      "paymentInfo": null
-    }
-  },
-  "error": null,
-  "message": "付款成功"
-}
-```
+ECPay 相關 API 規格集中維護於 `API_REFERENCE.md#ecpay-payment`。本文件只保留本地設定、手動測試流程與故障排除。
 
 ## 故障排除
 
