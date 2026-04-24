@@ -11,7 +11,7 @@ async function apiFetch(url, options = {}) {
     localStorage.removeItem(Auth.TOKEN_KEY);
     localStorage.removeItem(Auth.USER_KEY);
     window.location.href = '/login';
-    return;
+    throw { status: 401, data: null };
   }
 
   const data = await res.json();
