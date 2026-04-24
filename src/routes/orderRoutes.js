@@ -2,6 +2,20 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database');
 const authMiddleware = require('../middleware/authMiddleware');
+const {
+  EcpayError,
+  buildCheckoutForm,
+  createEcpayConfig,
+} = require('../services/ecpayService');
+const {
+  assignFreshMerchantTradeNo,
+  getOwnedOrder,
+  getPaymentMessage,
+  getPaymentResultFromOrder,
+  getOrderItems,
+  reconcileOrderPayment,
+  serializeOrder,
+} = require('../services/ecpayOrderService');
 
 const router = express.Router();
 
@@ -12,6 +26,18 @@ function generateOrderNo() {
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
   const random = uuidv4().slice(0, 5).toUpperCase();
   return `ORD-${dateStr}-${random}`;
+}
+
+function handleEcpayRouteError(res, err) {
+  const status = err instanceof EcpayError ? err.statusCode : 500;
+  const code = err instanceof EcpayError ? err.code : 'INTERNAL_ERROR';
+  const message = err instanceof EcpayError ? err.message : '伺服器內部錯誤';
+
+  return res.status(status).json({
+    data: null,
+    error: code,
+    message
+  });
 }
 
 /**
@@ -294,16 +320,14 @@ router.get('/', (req, res) => {
  *         description: 訂單不存在
  */
 router.get('/:id', (req, res) => {
-  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(req.params.id, req.user.userId);
+  const order = getOwnedOrder(req.params.id, req.user.userId);
 
   if (!order) {
     return res.status(404).json({ data: null, error: 'NOT_FOUND', message: '訂單不存在' });
   }
 
-  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
-
   res.json({
-    data: { ...order, items },
+    data: serializeOrder(order),
     error: null,
     message: '成功'
   });
@@ -311,9 +335,9 @@ router.get('/:id', (req, res) => {
 
 /**
  * @openapi
- * /api/orders/{id}/pay:
- *   patch:
- *     summary: 模擬付款（更新訂單付款狀態）
+ * /api/orders/{id}/ecpay/checkout:
+ *   post:
+ *     summary: 建立 ECPay AIO 付款表單
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -323,73 +347,16 @@ router.get('/:id', (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [action]
- *             properties:
- *               action:
- *                 type: string
- *                 enum: [success, fail]
  *     responses:
  *       200:
- *         description: 付款狀態更新成功
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                     order_no:
- *                       type: string
- *                     total_amount:
- *                       type: integer
- *                     status:
- *                       type: string
- *                     created_at:
- *                       type: string
- *                     items:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           product_name:
- *                             type: string
- *                           product_price:
- *                             type: integer
- *                           quantity:
- *                             type: integer
- *                 error:
- *                   type: string
- *                   nullable: true
- *                 message:
- *                   type: string
+ *         description: 回傳綠界 AIO form action 與 params
  *       400:
- *         description: action 無效或訂單狀態不是 pending
+ *         description: 訂單狀態不是 pending
  *       404:
  *         description: 訂單不存在
  */
-router.patch('/:id/pay', (req, res) => {
-  const { action } = req.body;
-  const userId = req.user.userId;
-
-  const actionMap = { success: 'paid', fail: 'failed' };
-  if (!action || !actionMap[action]) {
-    return res.status(400).json({
-      data: null,
-      error: 'VALIDATION_ERROR',
-      message: 'action 必須為 success 或 fail'
-    });
-  }
-
-  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(req.params.id, userId);
+router.post('/:id/ecpay/checkout', (req, res) => {
+  const order = getOwnedOrder(req.params.id, req.user.userId);
   if (!order) {
     return res.status(404).json({ data: null, error: 'NOT_FOUND', message: '訂單不存在' });
   }
@@ -398,20 +365,124 @@ router.patch('/:id/pay', (req, res) => {
     return res.status(400).json({
       data: null,
       error: 'INVALID_STATUS',
-      message: '訂單狀態不是 pending，無法付款'
+      message: '訂單狀態不是 pending，無法建立付款'
     });
   }
 
-  const newStatus = actionMap[action];
-  db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(newStatus, order.id);
-
-  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
-  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
+  const merchantTradeNo = assignFreshMerchantTradeNo(order.id);
+  const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  const form = buildCheckoutForm({
+    order: updatedOrder,
+    items: getOrderItems(order.id),
+    merchantTradeNo,
+    baseUrl: process.env.BASE_URL || 'http://localhost:3001',
+  }, createEcpayConfig());
 
   res.json({
-    data: { ...updated, items },
+    data: form,
     error: null,
-    message: action === 'success' ? '付款成功' : '付款失敗'
+    message: 'ECPay 付款表單建立成功'
+  });
+});
+
+/**
+ * @openapi
+ * /api/orders/{id}/ecpay/query:
+ *   post:
+ *     summary: 主動查詢 ECPay 付款狀態（本地端主動查詢，不依賴伺服器回調）
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 回傳查詢後的訂單與付款狀態
+ *       400:
+ *         description: 尚未建立 ECPay 付款
+ *       404:
+ *         description: 訂單不存在
+ *       502:
+ *         description: 綠界查詢驗證失敗或回應與本地訂單不一致
+ */
+router.post('/:id/ecpay/query', async (req, res) => {
+  const order = getOwnedOrder(req.params.id, req.user.userId);
+  if (!order) {
+    return res.status(404).json({ data: null, error: 'NOT_FOUND', message: '訂單不存在' });
+  }
+
+  if (!order.ecpay_merchant_trade_no) {
+    return res.status(400).json({
+      data: null,
+      error: 'PAYMENT_NOT_STARTED',
+      message: '尚未建立 ECPay 付款'
+    });
+  }
+
+  if (order.status !== 'pending') {
+    return res.json({
+      data: {
+        ...serializeOrder(order),
+        paymentResult: getPaymentResultFromOrder(order)
+      },
+      error: null,
+      message: getPaymentMessage(order.status)
+    });
+  }
+
+  try {
+    const result = await reconcileOrderPayment(order, { config: createEcpayConfig() });
+    res.json({
+      data: {
+        ...result.order,
+        paymentResult: result.paymentResult
+      },
+      error: null,
+      message: result.message
+    });
+  } catch (err) {
+    return handleEcpayRouteError(res, err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/orders/{id}/pay:
+ *   patch:
+ *     summary: 已停用的模擬付款端點
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       410:
+ *         description: 模擬付款已停用
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   nullable: true
+ *                 error:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ */
+router.patch('/:id/pay', (req, res) => {
+  res.status(410).json({
+    data: null,
+    error: 'PAYMENT_FLOW_REMOVED',
+    message: '模擬付款已停用，請使用 ECPay 付款流程'
   });
 });
 

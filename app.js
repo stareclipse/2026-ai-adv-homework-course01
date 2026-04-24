@@ -32,6 +32,7 @@ app.use('/api/admin/products', require('./src/routes/adminProductRoutes'));
 app.use('/api/admin/orders', require('./src/routes/adminOrderRoutes'));
 app.use('/api/products', require('./src/routes/productRoutes'));
 app.use('/api/cart', require('./src/routes/cartRoutes'));
+app.use('/ecpay', require('./src/routes/ecpayRoutes'));
 app.use('/api/orders', require('./src/routes/orderRoutes'));
 
 // Page Routes

@@ -70,22 +70,57 @@
       </table>
     </div>
 
+    <!-- ECPay Payment Info -->
+    <div v-if="order.ecpay_payment_info" class="bg-white rounded-2xl shadow-sm p-6 mb-6">
+      <h2 class="font-medium text-text-primary mb-3">綠界繳費資訊</h2>
+      <div class="text-sm space-y-2 text-text-secondary">
+        <p v-if="order.ecpay_payment_type">付款方式：{{ order.ecpay_payment_type }}</p>
+        <p v-if="order.ecpay_payment_info.BankCode">銀行代碼：{{ order.ecpay_payment_info.BankCode }}</p>
+        <p v-if="order.ecpay_payment_info.vAccount">虛擬帳號：{{ order.ecpay_payment_info.vAccount }}</p>
+        <p v-if="order.ecpay_payment_info.PaymentNo">繳費代碼：{{ order.ecpay_payment_info.PaymentNo }}</p>
+        <p v-if="order.ecpay_payment_info.PaymentURL">
+          繳費連結：
+          <a :href="order.ecpay_payment_info.PaymentURL" target="_blank" rel="noopener" class="text-rose-primary hover:underline">
+            開啟
+          </a>
+        </p>
+        <p v-if="order.ecpay_payment_info.Barcode1">條碼一：{{ order.ecpay_payment_info.Barcode1 }}</p>
+        <p v-if="order.ecpay_payment_info.Barcode2">條碼二：{{ order.ecpay_payment_info.Barcode2 }}</p>
+        <p v-if="order.ecpay_payment_info.Barcode3">條碼三：{{ order.ecpay_payment_info.Barcode3 }}</p>
+        <p v-if="order.ecpay_payment_info.ExpireDate">繳費期限：{{ order.ecpay_payment_info.ExpireDate }}</p>
+        <p class="text-apricot">請完成繳費後，再回到此頁手動查詢付款狀態。</p>
+      </div>
+    </div>
+
     <!-- Payment Buttons -->
-    <div v-if="order.status === 'pending'" class="flex gap-4">
-      <button
-        @click="handlePaySuccess"
-        :disabled="paying"
-        class="bg-sage text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-sage/90 transition-colors disabled:opacity-50"
-      >
-        {{ paying ? '處理中...' : '付款成功' }}
-      </button>
-      <button
-        @click="handlePayFail"
-        :disabled="paying"
-        class="bg-red-500 text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
-      >
-        {{ paying ? '處理中...' : '付款失敗' }}
-      </button>
+    <div v-if="order.status === 'pending'" class="space-y-4">
+      <div class="flex flex-wrap gap-4">
+        <button
+          @click="startEcpayPayment"
+          :disabled="paying"
+          class="bg-sage text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-sage/90 transition-colors disabled:opacity-50"
+        >
+          {{ paying ? '導向中...' : '前往綠界付款' }}
+        </button>
+        <button
+          @click="queryPaymentStatus(true)"
+          :disabled="checking"
+          class="bg-white border border-gray-200 text-text-primary px-8 py-3 rounded-full text-sm font-medium hover:border-rose-primary hover:text-rose-primary transition-colors disabled:opacity-50"
+        >
+          {{ checking ? '查詢中...' : '手動查詢付款狀態' }}
+        </button>
+      </div>
+
+      <!-- Local Testing Info -->
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
+        <p class="font-medium mb-2">本地測試說明</p>
+        <ul class="space-y-1 text-xs">
+          <li>✓ 點擊「前往綠界付款」進行付款</li>
+          <li>✓ 從綠界返回商店時，後端會先向綠界查詢一次付款狀態</li>
+          <li>✓ 若仍待付款，頁面只會做有限次補查，不會固定輪詢</li>
+          <li>✓ 可隨時點擊「手動查詢付款狀態」立即檢查</li>
+        </ul>
+      </div>
     </div>
   </template>
 </div>

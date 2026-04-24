@@ -2,7 +2,7 @@
 
 ## 項目介紹
 
-花漾生活是一個教學用花卉電商 Demo，提供前台商品瀏覽、會員註冊登入、訪客與會員購物車、結帳建立訂單、模擬付款、會員訂單查詢，以及管理員商品與訂單管理。專案同時包含 EJS 頁面與 REST API，前端頁面透過 Vue 3 CDN 呼叫同一組 API。
+花漾生活是一個教學用花卉電商 Demo，提供前台商品瀏覽、會員註冊登入、訪客與會員購物車、結帳建立訂單、ECPay 綠界 AIO 付款、會員訂單查詢，以及管理員商品與訂單管理。專案同時包含 EJS 頁面與 REST API，前端頁面透過 Vue 3 CDN 呼叫同一組 API。
 
 此專案的核心資料存放於本機 SQLite 檔案 `database.sqlite`。啟動應用程式時會載入 `src/database.js`，自動建立資料表、建立預設管理員帳號、在商品表為空時寫入種子商品。這代表第一次啟動不需要額外 migration 指令，但新增 schema 時必須小心既有資料與測試資料庫狀態。
 
@@ -79,9 +79,13 @@ BASE_URL=http://localhost:3001
 FRONTEND_URL=http://localhost:5173
 ADMIN_EMAIL=admin@hexschool.com
 ADMIN_PASSWORD=12345678
+ECPAY_MERCHANT_ID=3002607
+ECPAY_HASH_KEY=pwFHCqoQZGmho4w6
+ECPAY_HASH_IV=EkRm7iFT261dpevs
+ECPAY_ENV=staging
 ```
 
-`ECPAY_MERCHANT_ID`、`ECPAY_HASH_KEY`、`ECPAY_HASH_IV`、`ECPAY_ENV` 目前只在 `.env.example` 中預留，程式碼未讀取或呼叫 ECPay API。請不要把目前付款流程描述為真實金流串接。
+本專案在本地端運行，無法依賴綠界 Server Notify。付款完成後，綠界的「返回商店」會先打到本站公開 `/ecpay/*` 路由，由後端先向綠界查詢一次，再 redirect 回訂單詳情頁；若仍是待付款，頁面只會做有限次退避補查，並保留手動查詢。
 
 ## 文件索引
 
@@ -103,7 +107,6 @@ ADMIN_PASSWORD=12345678
 | 認證 | 已完成 | 註冊、登入、profile、JWT 7 天 |
 | 購物車 | 已完成 | 支援訪客 session 與會員 JWT 雙模式 |
 | 訂單 | 已完成 | 登入會員從購物車建立訂單，transaction 扣庫存 |
-| 付款 | 模擬完成 | 使用 API 更新 `pending` 訂單為 `paid` 或 `failed` |
+| 付款 | 已完成 | ECPay AIO `ChoosePayment=ALL`，`/ecpay/*` 回跳先查，再由訂單頁有限次補查 |
 | 後台商品 | 已完成 | 管理員列表、新增、編輯、刪除 |
 | 後台訂單 | 已完成 | 管理員列表、狀態篩選、詳情 |
-| 第三方金流 | 未完成 | ECPay 變數已預留但尚未整合 |

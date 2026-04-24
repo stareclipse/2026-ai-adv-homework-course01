@@ -8,10 +8,9 @@
 | 公開商品列表/詳情 | 已完成 | `src/routes/productRoutes.js`、`public/js/pages/index.js`、`public/js/pages/product-detail.js` |
 | 購物車 | 已完成 | `src/routes/cartRoutes.js`、`public/js/pages/cart.js` |
 | 建立訂單/我的訂單/訂單詳情 | 已完成 | `src/routes/orderRoutes.js`、checkout/orders/order-detail page scripts |
-| 模擬付款 | 已完成，非真實金流 | `src/routes/orderRoutes.js`、`public/js/pages/order-detail.js` |
+| ECPay 第三方金流 | 已完成，本地端主動查詢驗證 | `src/services/ecpayService.js`、`src/services/ecpayOrderService.js`、`src/routes/orderRoutes.js`、`src/routes/ecpayRoutes.js`、`public/js/pages/order-detail.js` |
 | 後台商品管理 | 已完成 | `src/routes/adminProductRoutes.js`、`public/js/pages/admin-products.js` |
 | 後台訂單管理 | 已完成 | `src/routes/adminOrderRoutes.js`、`public/js/pages/admin-orders.js` |
-| ECPay 第三方金流 | 未完成 | `.env.example` 僅預留設定 |
 
 ## 認證功能
 
@@ -304,43 +303,78 @@ body：
 | --- | --- | --- |
 | 404 | `NOT_FOUND` | 訂單不存在或不屬於目前會員 |
 
-## 模擬付款功能
+## ECPay 付款功能
 
 ### 行為描述
 
-目前付款不是 ECPay，也不是任何真實金流。這個功能只讓使用者在訂單詳情頁按下成功或失敗，並把訂單狀態從 `pending` 改成 `paid` 或 `failed`。
+付款使用綠界 AIO，`ChoosePayment=ALL`。本專案只在本地端運行，不依賴綠界 Server Notify 更新訂單；綠界 browser return 會先進到本站公開 `/ecpay/*` 路由，由後端先呼叫 `QueryTradeInfo/V5` 驗證回傳 `CheckMacValue`、特店編號、交易編號與金額後，再 redirect 回 `/orders/:id?payment=success|failed|returned`。訂單頁只保留手動查詢，並在 `payment=returned` 且尚未取得離線繳費資訊時做有限次退避補查。
 
-前端 `order-detail.js` 對應：
-
-- `handlePaySuccess()` 呼叫 `simulatePay('success')`
-- `handlePayFail()` 呼叫 `simulatePay('fail')`
-
-### `PATCH /api/orders/:id/pay`
+### `POST /api/orders/:id/ecpay/checkout`
 
 認證：Bearer JWT。
 
-body：
-
-| 欄位 | 必填 | 允許值 |
-| --- | --- | --- |
-| `action` | 是 | `success` 或 `fail` |
-
 業務邏輯：
 
-1. 驗證 `action`。
-2. 依 `id` 與 `user_id` 查詢自己的訂單。
-3. 只有 `pending` 可更新。
-4. `success` 更新為 `paid`。
-5. `fail` 更新為 `failed`。
-6. 回傳更新後訂單與明細。
+1. 查詢目前會員自己的 pending 訂單。
+2. 每次付款導向前都重新產生 20 字元內的英數 `ecpay_merchant_trade_no` 並寫入訂單，避免同一張本地訂單重複送出時被綠界判定 `MerchantTradeNo` 重複。
+3. 建立 AIO form 參數，包含 `MerchantID`、`MerchantTradeNo`、`MerchantTradeDate`、`PaymentType=aio`、`TotalAmount`、`TradeDesc`、`ItemName`、`ReturnURL=/ecpay/notify`、`ClientBackURL=/ecpay/client-back?orderId=...`、`ClientRedirectURL=/ecpay/client-redirect?orderId=...`、`ChoosePayment=ALL`、`EncryptType=1`、`CheckMacValue`。
+4. 回傳綠界 action URL、method 與 params，由前端建立 hidden form POST 到綠界。
 
 錯誤情境：
 
 | 狀態碼 | error | 情境 |
 | --- | --- | --- |
-| 400 | `VALIDATION_ERROR` | action 缺失或不是 `success`/`fail` |
 | 400 | `INVALID_STATUS` | 訂單不是 `pending` |
 | 404 | `NOT_FOUND` | 訂單不存在或不屬於目前會員 |
+
+### `POST /api/orders/:id/ecpay/query`
+
+認證：Bearer JWT。
+
+業務邏輯：
+
+1. 查詢目前會員自己的訂單。
+2. 若尚未建立 ECPay 付款，回 `PAYMENT_NOT_STARTED`。
+3. 若訂單仍為 `pending`，呼叫綠界 `QueryTradeInfo/V5`。
+4. 驗證回傳 `CheckMacValue`，並比對 `MerchantID`、`MerchantTradeNo`、`TradeAmt`。
+5. `TradeStatus=1` 更新訂單為 `paid`；`10100248`、`10100254`、`10200095`、`10200163` 更新為 `failed`；其他狀態維持 `pending`。
+6. 若付款方式為 ATM/CVS/BARCODE 且仍 pending，嘗試呼叫 `QueryPaymentInfo` 取得繳費資訊並顯示於訂單詳情頁。
+
+### 公開 `/ecpay/*` 回跳路由
+
+這組 route 不需要登入，專門處理綠界 browser return 與可能的 server notify。
+
+#### `GET /ecpay/client-back`
+
+1. 從 query string 讀取 `orderId`。
+2. 以該訂單目前的 `ecpay_merchant_trade_no` 主動查詢綠界。
+3. 驗證成功後 redirect 到 `/orders/:id?payment=success|failed|returned`。
+
+#### `POST /ecpay/client-redirect`
+
+1. 用於 ATM/CVS/BARCODE 完成取號後的 browser POST return。
+2. 先走同一套 `QueryTradeInfo` 驗證與狀態更新。
+3. 若仍為 pending，會補查 `QueryPaymentInfo` 並寫入 `ecpay_payment_info`。
+4. 最後以 `303` redirect 回 `/orders/:id?payment=returned`。
+
+#### `POST /ecpay/notify`
+
+1. 固定回 `1|OK`。
+2. 若 request body 能對應到本地訂單，會走同一套 reconcile helper。
+3. 不直接信任 callback body 更新訂單狀態。
+
+錯誤情境：
+
+| 狀態碼 | error | 情境 |
+| --- | --- | --- |
+| 400 | `PAYMENT_NOT_STARTED` | 尚未建立 ECPay 付款 |
+| 404 | `NOT_FOUND` | 訂單不存在或不屬於目前會員 |
+| 502 | `ECPAY_VERIFY_FAILED` | 綠界查詢回應檢查碼驗證失敗 |
+| 502 | `ECPAY_ORDER_MISMATCH` | 綠界查詢回應與本地訂單不一致 |
+
+### `PATCH /api/orders/:id/pay`
+
+此模擬付款端點已停用，固定回 `410 PAYMENT_FLOW_REMOVED`。
 
 ## 後台商品管理
 
@@ -491,7 +525,14 @@ body 全欄位選填。未提供欄位會沿用既有值。
 5. 呼叫 `POST /api/orders`。
 6. 成功後導向 `/orders/:id`。
 
+`order-detail.js` 會：
+
+1. 載入 `/api/orders/:id`。
+2. pending 訂單可呼叫 `/api/orders/:id/ecpay/checkout` 取得綠界 AIO 表單並 POST 導向綠界。
+3. 可呼叫 `/api/orders/:id/ecpay/query` 由本機後端主動查詢綠界付款狀態。
+4. 若網址帶 `payment=success|failed`，只顯示後端已驗證過的結果。
+5. 若網址帶 `payment=returned` 且訂單仍 pending，頁面只會做有限次退避補查；若已取得 ATM/CVS/BARCODE 繳費資訊，會提示先完成繳費再手動查詢。
+
 ### 後台頁
 
 `views/layouts/admin.ejs` 在前端呼叫 `Auth.requireAdmin()`。這只負責使用者體驗；後台 API 仍有後端 admin middleware 防護。
-

@@ -52,6 +52,13 @@ function initializeDatabase() {
       recipient_address TEXT NOT NULL,
       total_amount INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'paid', 'failed')),
+      ecpay_merchant_trade_no TEXT UNIQUE,
+      ecpay_trade_no TEXT,
+      ecpay_payment_type TEXT,
+      ecpay_trade_status TEXT,
+      ecpay_payment_date TEXT,
+      ecpay_payment_info TEXT,
+      ecpay_last_checked_at TEXT,
 
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
@@ -68,9 +75,36 @@ function initializeDatabase() {
     );
   `);
 
+  ensureOrderPaymentColumns();
+
   // Seed data
   seedAdminUser();
   seedProducts();
+}
+
+function ensureOrderPaymentColumns() {
+  const columns = db.prepare('PRAGMA table_info(orders)').all().map(column => column.name);
+  const definitions = [
+    ['ecpay_merchant_trade_no', 'TEXT'],
+    ['ecpay_trade_no', 'TEXT'],
+    ['ecpay_payment_type', 'TEXT'],
+    ['ecpay_trade_status', 'TEXT'],
+    ['ecpay_payment_date', 'TEXT'],
+    ['ecpay_payment_info', 'TEXT'],
+    ['ecpay_last_checked_at', 'TEXT'],
+  ];
+
+  for (const [name, definition] of definitions) {
+    if (!columns.includes(name)) {
+      db.prepare(`ALTER TABLE orders ADD COLUMN ${name} ${definition}`).run();
+    }
+  }
+
+  db.prepare(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_ecpay_merchant_trade_no
+     ON orders(ecpay_merchant_trade_no)
+     WHERE ecpay_merchant_trade_no IS NOT NULL`
+  ).run();
 }
 
 function seedAdminUser() {

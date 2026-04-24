@@ -209,15 +209,15 @@ createApp({
 | --- | --- | --- | --- | --- |
 | `JWT_SECRET` | JWT 簽發與驗證 secret | 正式啟動必填 | 無 | `server.js`、auth/cart middleware |
 | `PORT` | Express listen port | 選填 | `3001` | `server.js` |
-| `BASE_URL` | 應用 base URL | 目前未使用 | `http://localhost:3001` in example | `.env.example` only |
+| `BASE_URL` | 應用 base URL，用於 ECPay `ReturnURL`、`ClientBackURL`、`ClientRedirectURL` | 選填 | `http://localhost:3001` | `src/services/ecpayService.js` |
 | `FRONTEND_URL` | CORS origin | 選填 | `http://localhost:3001` in code；example 為 `http://localhost:5173` | `app.js` |
 | `ADMIN_EMAIL` | seed admin email | 選填 | `admin@hexschool.com` | `src/database.js` |
 | `ADMIN_PASSWORD` | seed admin password | 選填 | `12345678` | `src/database.js` |
 | `NODE_ENV` | 測試時降低 bcrypt salt rounds | 選填 | 無 | `src/database.js` |
-| `ECPAY_MERCHANT_ID` | ECPay 商店代號 | 預留，未使用 | `3002607` in example | 未讀取 |
-| `ECPAY_HASH_KEY` | ECPay HashKey | 預留，未使用 | example value | 未讀取 |
-| `ECPAY_HASH_IV` | ECPay HashIV | 預留，未使用 | example value | 未讀取 |
-| `ECPAY_ENV` | ECPay 環境 | 預留，未使用 | `staging` | 未讀取 |
+| `ECPAY_MERCHANT_ID` | ECPay 商店代號 | 選填 | `3002607` | `src/services/ecpayService.js` |
+| `ECPAY_HASH_KEY` | ECPay HashKey | 選填 | 測試 HashKey | `src/services/ecpayService.js` |
+| `ECPAY_HASH_IV` | ECPay HashIV | 選填 | 測試 HashIV | `src/services/ecpayService.js` |
+| `ECPAY_ENV` | ECPay 環境，`staging` 或 `production`/`prod` | 選填 | `staging` | `src/services/ecpayService.js` |
 
 ## JSDoc 與註解規範
 
@@ -276,4 +276,3 @@ createApp({
 | 新增 npm script | `AGENTS.md`、`docs/README.md` |
 | 完成功能或修復重要 bug | `docs/CHANGELOG.md` |
 | 新增第三方整合 | `docs/ARCHITECTURE.md`、`docs/FEATURES.md`、`.env.example` |
-

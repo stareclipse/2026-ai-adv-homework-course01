@@ -68,7 +68,7 @@ login/register API returns token + user
 | `server.js` | production/dev server 入口，檢查 `JWT_SECRET` 並監聽 port |
 | `package.json` | scripts、dependencies、devDependencies |
 | `package-lock.json` | npm 鎖定依賴版本 |
-| `.env.example` | 環境變數範本，包含 JWT、server、admin seed、ECPay 預留變數 |
+| `.env.example` | 環境變數範本，包含 JWT、server、admin seed、ECPay 測試環境變數 |
 | `.gitignore` | 忽略依賴、CSS build output、SQLite、env、coverage、IDE 檔 |
 | `swagger-config.js` | OpenAPI 3.0.3 設定與 security schemes |
 | `generate-openapi.js` | 使用 `swagger-jsdoc` 產生 `openapi.json` |
@@ -84,7 +84,10 @@ login/register API returns token + user
 | `src/routes/authRoutes.js` | 註冊、登入、profile API |
 | `src/routes/productRoutes.js` | 公開商品列表與商品詳情 API |
 | `src/routes/cartRoutes.js` | 購物車 API，包含內部 `dualAuth()` |
-| `src/routes/orderRoutes.js` | 會員訂單 API 與模擬付款 API |
+| `src/routes/orderRoutes.js` | 會員訂單 API 與會員主動查詢付款狀態 API |
+| `src/routes/ecpayRoutes.js` | 公開 ECPay browser return / notify 路由 |
+| `src/services/ecpayService.js` | ECPay AIO CheckMacValue、付款表單與查詢 API helper |
+| `src/services/ecpayOrderService.js` | 綠界查詢驗證、訂單 reconcile、離線繳費資訊補查 |
 | `src/routes/adminProductRoutes.js` | 管理員商品 CRUD API |
 | `src/routes/adminOrderRoutes.js` | 管理員訂單列表、狀態篩選、詳情 API |
 | `src/routes/pageRoutes.js` | 前台與後台 EJS page routes |
@@ -101,7 +104,7 @@ login/register API returns token + user
 | `public/js/pages/checkout.js` | 結帳表單驗證、建立訂單 |
 | `public/js/pages/login.js` | 登入/註冊 tab、表單驗證、登入後 redirect |
 | `public/js/pages/orders.js` | 會員訂單列表 |
-| `public/js/pages/order-detail.js` | 訂單詳情與模擬付款 |
+| `public/js/pages/order-detail.js` | 訂單詳情、綠界付款導向與付款狀態查詢 |
 | `public/js/pages/admin-products.js` | 後台商品列表、modal 新增/編輯/刪除 |
 | `public/js/pages/admin-orders.js` | 後台訂單列表、狀態篩選、詳情 modal |
 | `views/layouts/front.ejs` | 前台 layout，載入 Vue、auth/api/notification/header-init 與 page script |
@@ -138,7 +141,7 @@ login/register API returns token + user
 | `/api/auth` | `src/routes/authRoutes.js` | register/login 無；profile 需 Bearer JWT | 會員註冊、登入、取得個人資料 |
 | `/api/products` | `src/routes/productRoutes.js` | 無 | 公開商品列表與商品詳情 |
 | `/api/cart` | `src/routes/cartRoutes.js` | Bearer JWT 或 `X-Session-Id` | 購物車查詢、新增、更新、刪除 |
-| `/api/orders` | `src/routes/orderRoutes.js` | Bearer JWT | 建立訂單、會員訂單列表、詳情、模擬付款 |
+| `/api/orders` | `src/routes/orderRoutes.js` | Bearer JWT | 建立訂單、會員訂單列表、詳情、ECPay 付款與查詢 |
 | `/api/admin/products` | `src/routes/adminProductRoutes.js` | Bearer JWT + admin role | 後台商品列表、新增、編輯、刪除 |
 | `/api/admin/orders` | `src/routes/adminOrderRoutes.js` | Bearer JWT + admin role | 後台訂單列表、狀態篩選、詳情 |
 
@@ -152,7 +155,7 @@ login/register API returns token + user
 | `/checkout` | `views/pages/checkout.ejs` | `front` | `checkout` | 結帳，前端要求登入 |
 | `/login` | `views/pages/login.ejs` | `front` | `login` | 登入與註冊 |
 | `/orders` | `views/pages/orders.ejs` | `front` | `orders` | 會員訂單列表，前端要求登入 |
-| `/orders/:id` | `views/pages/order-detail.ejs` | `front` | `order-detail` | 訂單詳情與模擬付款 |
+| `/orders/:id` | `views/pages/order-detail.ejs` | `front` | `order-detail` | 訂單詳情、綠界付款與付款狀態查詢 |
 | `/admin/products` | `views/pages/admin/products.ejs` | `admin` | `admin-products` | 管理員商品管理 |
 | `/admin/orders` | `views/pages/admin/orders.ejs` | `admin` | `admin-orders` | 管理員訂單管理 |
 
@@ -324,6 +327,13 @@ PRAGMA foreign_keys = ON;
 | `recipient_address` | `TEXT` | `NOT NULL` | 收件地址 |
 | `total_amount` | `INTEGER` | `NOT NULL` | 商品總額，不含前端顯示運費 |
 | `status` | `TEXT` | `NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'paid', 'failed'))` | 訂單狀態 |
+| `ecpay_merchant_trade_no` | `TEXT` | `UNIQUE` | 綠界特店交易編號，20 字元內英數 |
+| `ecpay_trade_no` | `TEXT` | 無 | 綠界交易編號 |
+| `ecpay_payment_type` | `TEXT` | 無 | 綠界付款方式回覆值 |
+| `ecpay_trade_status` | `TEXT` | 無 | 綠界 `TradeStatus` 查詢結果 |
+| `ecpay_payment_date` | `TEXT` | 無 | 綠界付款時間 |
+| `ecpay_payment_info` | `TEXT` | 無 | ATM/CVS/BARCODE 繳費資訊 JSON |
+| `ecpay_last_checked_at` | `TEXT` | 無 | 最後主動查詢綠界時間 |
 | `created_at` | `TEXT` | `NOT NULL DEFAULT (datetime('now'))` | 建立時間 |
 
 ### `order_items`
@@ -356,23 +366,25 @@ PRAGMA foreign_keys = ON;
 
 ## 金流與第三方整合
 
-目前沒有真實第三方金流整合。`.env.example` 保留以下 ECPay 變數：
+本專案串接綠界 ECPay AIO。付款方式使用 `ChoosePayment=ALL`，由前端取得後端產生的 AIO 表單參數後，以瀏覽器 POST 導向綠界付款頁。
 
-| 變數 | 現況 |
+| 變數 | 用途 |
 | --- | --- |
-| `ECPAY_MERCHANT_ID` | 未被程式碼讀取 |
-| `ECPAY_HASH_KEY` | 未被程式碼讀取 |
-| `ECPAY_HASH_IV` | 未被程式碼讀取 |
-| `ECPAY_ENV` | 未被程式碼讀取 |
+| `ECPAY_MERCHANT_ID` | 綠界特店編號，未設定時使用測試帳號 `3002607` |
+| `ECPAY_HASH_KEY` | AIO CheckMacValue HashKey |
+| `ECPAY_HASH_IV` | AIO CheckMacValue HashIV |
+| `ECPAY_ENV` | `staging` 使用測試環境；`production`/`prod` 使用正式環境 |
 
-目前付款流程是模擬狀態更新：
+本地端限制與付款狀態更新流程：
 
 1. 會員建立訂單後狀態為 `pending`。
-2. 前端訂單詳情頁顯示 `付款成功` 與 `付款失敗` 按鈕。
-3. 點擊後呼叫 `PATCH /api/orders/:id/pay`。
-4. body `action: "success"` 將訂單更新為 `paid`。
-5. body `action: "fail"` 將訂單更新為 `failed`。
-6. 只有 `pending` 訂單可付款；其他狀態回 400 `INVALID_STATUS`。
+2. 前端訂單詳情頁呼叫 `POST /api/orders/:id/ecpay/checkout`。
+3. 後端每次付款導向前都重新產生 `ecpay_merchant_trade_no`，組出 AIO form params 與 `CheckMacValue`，避免綠界拒絕重複的 `MerchantTradeNo`。
+4. 前端用 hidden form POST 到綠界 AIO 付款頁。
+5. 綠界 Server Notify 不可作為本機主流程，因此 `ReturnURL`、`ClientBackURL`、`ClientRedirectURL` 都先進入本站公開 `/ecpay/*` 路由。
+6. `/ecpay/client-back` 與 `/ecpay/client-redirect` 會先呼叫同一套 reconcile helper，再 redirect 到 `/orders/:id?payment=success|failed|returned`。
+7. `POST /api/orders/:id/ecpay/query` 與 `/ecpay/*` 共用同一套 `QueryTradeInfo/V5` 驗證與訂單更新邏輯。
+8. `TradeStatus=1` 更新為 `paid`；`10100248`、`10100254`、`10200095`、`10200163` 更新為 `failed`；其他狀態維持 `pending`。
+9. ATM/CVS/BARCODE pending 訂單會嘗試呼叫 `QueryPaymentInfo` 取得繳費資訊；訂單頁只做有限次退避補查，不做固定輪詢。
 
-若未來串接 ECPay，必須新增正式付款建立、CheckMacValue、return/callback、狀態冪等更新、金流失敗處理與測試，不可直接沿用目前模擬 API 當成正式金流完成。
-
+`PATCH /api/orders/:id/pay` 模擬付款端點已停用，固定回 `410 PAYMENT_FLOW_REMOVED`。

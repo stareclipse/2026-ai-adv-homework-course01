@@ -40,6 +40,8 @@ export default defineConfig({
     fileParallelism: false,
     sequence: {
       files: [
+        'tests/ecpayService.test.js',
+        'tests/ecpayRoutes.test.js',
         'tests/auth.test.js',
         'tests/products.test.js',
         'tests/cart.test.js',
@@ -67,6 +69,8 @@ export default defineConfig({
 | 檔案 | 覆蓋功能 | 重要依賴 |
 | --- | --- | --- |
 | `tests/setup.js` | 共用 helper | import `app` 會初始化 DB |
+| `tests/ecpayService.test.js` | ECPay CheckMacValue、AIO 表單參數 | 不呼叫外部綠界服務 |
+| `tests/ecpayRoutes.test.js` | 公開 `/ecpay/*` 回跳、redirect 與 notify reconcile | 直接建立測試訂單並 mock 綠界查詢 |
 | `tests/auth.test.js` | 註冊、重複 email、登入、錯誤密碼、profile、未登入 profile | 依賴 seed admin |
 | `tests/products.test.js` | 公開商品列表、分頁、詳情、404 | 依賴 seed products |
 | `tests/cart.test.js` | 訪客購物車新增/查詢/更新/刪除、會員購物車、新增不存在商品 | 依賴產品資料與 `X-Session-Id` |
@@ -130,7 +134,7 @@ const res = await request(app).get('/api/products');
 
 1. 選擇對應測試檔。新會員訂單行為放 `orders.test.js`，後台商品行為放 `adminProducts.test.js`。
 2. 若測試需要登入，使用 `registerUser()` 或 `getAdminToken()`。
-3. 若測試需要商品，從 `GET /api/products` 取得現有 seed product，或用 admin API 建立測試商品。
+3. 若測試需要商品，優先建立自己的測試商品；不要依賴 seed 商品仍有足夠庫存。
 4. 每個 API 測試至少 assert：
    - HTTP status。
    - `res.body` 有 `data`。
@@ -202,16 +206,20 @@ it('should deny regular users', async () => {
 
 `vitest.config.js` 目前列出的預期測試檔順序是：
 
-1. `auth.test.js`
-2. `products.test.js`
-3. `cart.test.js`
-4. `orders.test.js`
-5. `adminProducts.test.js`
-6. `adminOrders.test.js`
+1. `ecpayService.test.js`
+2. `ecpayRoutes.test.js`
+3. `auth.test.js`
+4. `products.test.js`
+5. `cart.test.js`
+6. `orders.test.js`
+7. `adminProducts.test.js`
+8. `adminOrders.test.js`
 
 設計意圖：
 
-- `auth.test.js` 先確認 seed admin 可登入，也建立一般會員測試基本認證。
+- `ecpayService.test.js` 先驗證純函式與表單參數，不依賴 DB。
+- `ecpayRoutes.test.js` 驗證公開回跳路由與同一套 reconcile helper。
+- `auth.test.js` 確認 seed admin 可登入，也建立一般會員測試基本認證。
 - `products.test.js` 依賴 seed products，並提供其他測試會使用的商品形狀參考。
 - `cart.test.js` 驗證訪客與會員購物車，會新增/刪除購物車資料。
 - `orders.test.js` 會建立訂單、扣庫存、清空購物車。
@@ -228,7 +236,7 @@ it('should deny regular users', async () => {
 
 ### 2. 訂單測試會扣庫存
 
-`POST /api/orders` 會扣 products stock。多次執行測試可能讓某些 seed 商品庫存下降。現有測試每次只扣少量，但新增大量下單測試時要建立專用商品或重置 DB。
+`POST /api/orders` 會扣 products stock。多次執行測試可能讓某些 seed 商品庫存下降。現有測試已改成建立專用商品；新增大量下單測試時也應沿用這個模式，避免 seed 商品被重複扣到 0。
 
 ### 3. 建立訂單會清空會員購物車
 
